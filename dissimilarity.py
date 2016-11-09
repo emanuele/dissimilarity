@@ -10,15 +10,15 @@ from __future__ import division
 import numpy as np
 from dipy.tracking.distances import bundles_distances_mam
 try:
-    from joblib import Parallel, Delayed, cpu_count
+    from joblib import Parallel, delayed, cpu_count
     joblib_available = True
 except:
     joblib_available = False
-    
 
-def furthest_first_traversal(S, k, distance, permutation=True):
+
+def furthest_first_traversal(tracks, k, distance, permutation=True):
     """This is the farthest first traversal (fft) algorithm which
-    selects k streamlines out of a set of streamlines (S). This
+    selects k streamlines out of a set of streamlines (tracks). This
     algorithms is known to be a good sub-optimal solution to the
     k-center problem, i.e. the k streamlines are sequentially selected
     in order to be far away from each other.
@@ -26,7 +26,7 @@ def furthest_first_traversal(S, k, distance, permutation=True):
     Parameters
     ----------
 
-    S : list or array of objects
+    tracks : list or array of objects
         an iterable of streamlines.
     k : int
         the number of streamlines to select.
@@ -53,31 +53,32 @@ def furthest_first_traversal(S, k, distance, permutation=True):
     --------
     subset_furthest_first
 
-    
+
     """
     if permutation:
-        idx = np.random.permutation(S.shape[0])
-        S = S[idx]       
+        idx = np.random.permutation(len(tracks))
+        tracks = tracks[idx]
     else:
-        idx = np.arange(S.shape[0], dtype=np.int)
+        idx = np.arange(len(tracks), dtype=np.int)
 
     T = [0]
     while len(T) < k:
-        z = distance(S, S[T]).min(1).argmax()
+        z = distance(tracks, tracks[T]).min(1).argmax()
         T.append(z)
 
     return idx[T]
 
 
-def subset_furthest_first(S, k, distance, permutation=True, c=2.0):
+def subset_furthest_first(tracks, k, distance, permutation=True, c=2.0):
     """The subset furthest first (sff) algorithm is a stochastic
     version of the furthest first traversal (fft) algorithm. Sff
-    scales well on large set of objects (streamlines).
+    scales well on large set of objects (streamlines) because it
+    does not depend on len(tracks).
 
     Parameters
     ----------
 
-    S : list or array of objects
+    tracks : list or array of objects
         an iterable of streamlines.
     k : int
         the number of streamlines to select.
@@ -89,7 +90,7 @@ def subset_furthest_first(S, k, distance, permutation=True, c=2.0):
         side-effect.
     c : float
         Parameter to tune the probability that the random subset of
-        streamlines is sufficiently representive of S. Typically
+        streamlines is sufficiently representive of tracks. Typically
         2.0-3.0.
 
     Return
@@ -110,27 +111,37 @@ def subset_furthest_first(S, k, distance, permutation=True, c=2.0):
     """
     size = max(1, np.ceil(c * k * np.log(k)))
     if permutation:
-        idx = np.random.permutation(S.shape[0])[:size]       
+        idx = np.random.permutation(len(tracks))[:size]
     else:
         idx = range(size)
 
-    return idx[furthest_first_traversal(S[idx], k, distance, permutation=False)]
+    return idx[furthest_first_traversal(tracks[idx],
+                                        k, distance,
+                                        permutation=False)]
 
 
-def compute_dissimilarity(tracks, num_prototypes, distance=bundles_distances_mam, prototype_policy='sff', n_jobs=-1, verbose=False):
+def dissimilarity(tracks, prototypes, distance, n_jobs=-1, verbose=False):
     """Compute the dissimilarity (distance) matrix between tracks and
-    prototypes, where prototypes are selected among the tracks with a
-    given policy.
+    given prototypes. This function supports parallel (multicore)
+    computation.
 
     Parameters
     ----------
-    tracks : array of objects
-           Array of streamlines.
-    num_prototypes : int
+    tracks : list or array of objects
+           an iterable of streamlines.
+    prototypes : iterable of objects
+           The prototypes.
     distance : function
+           Distance function between groups of streamlines.
     prototype_policy : string
+           Shortname for the prototype selection policy. The default
+           value is 'sff'.
     n_jobs : int
+           If joblib is available, split the dissimilarity computation
+           in n_jobs. If n_jobs is -1, then all available cpus/cores
+           are used. The default value is -1.
     verbose : bool
+           If true prints some messages. Deafault is True.
 
     Return
     ------
@@ -144,33 +155,78 @@ def compute_dissimilarity(tracks, num_prototypes, distance=bundles_distances_mam
     -----
     """
     if verbose: print("Computing the dissimilarity matrix.")
-    if verbose: print("Generating %s prototypes with %s." % (num_proto, prototype_policy)),
-    if prototype_policy=='random':
-        prototype_idx = np.random.permutation(data_original.shape[0])[:num_proto]
-        prototype = [data_original[i] for i in prototype_idx]
-    elif prototype_policy=='fft':
-        prototype_idx = furthest_first_traversal(data_original, num_proto, distance)
-        prototype = [data_original[i] for i in prototype_idx]
-    elif prototype_policy=='sff':
-        prototype_idx = subset_furthest_first(data_original, num_proto, distance)
-        prototype = [data_original[i] for i in prototype_idx]                
-    else:
-        if verbose: print("Prototype selection policy not supported: %s" % prototype_policy)
-        raise Exception                
-
     if joblib_available and n_jobs != 1:
         if n_jobs is None or n_jobs == -1:
             n_jobs = cpu_count()
 
         if verbose: print("Parallel computation of the dissimilarity matrix: %s cpus." % n_jobs)
         if n_jobs > 1:
-            tmp = np.linspace(0, data.shape[0], n_jobs).astype(np.int)
-        else: # corner case: joblib detected 1 cpu only.
-            tmp = (0, data.shape[0])
+            tmp = np.linspace(0, len(tracks), n_jobs).astype(np.int)
+        else:  # corner case: joblib detected 1 cpu only.
+            tmp = (0, len(tracks))
 
         chunks = zip(tmp[:-1], tmp[1:])
-        dissimilarity_matrix = np.vstack(Parallel(n_jobs=n_jobs)(delayed(distance)(data[start:stop], prototype) for start, stop in chunks))
+        dissimilarity_matrix = np.vstack(Parallel(n_jobs=n_jobs)(delayed(distance)(tracks[start:stop], prototypes) for start, stop in chunks))
     else:
-        dissimilarity_matrix = distance(data, prototype)
-                
+        dissimilarity_matrix = distance(tracks, prototypes)
+
+    if verbose:
+        print("Done.")
+
     return dissimilarity_matrix
+
+
+def compute_dissimilarity(tracks, num_prototypes=40,
+                          distance=bundles_distances_mam,
+                          prototype_policy='sff',
+                          n_jobs=-1,
+                          verbose=False):
+    """Compute the dissimilarity (distance) matrix between tracks and
+    prototypes, where prototypes are selected among the tracks with a
+    given policy.
+
+    Parameters
+    ----------
+    tracks : list or array of objects
+           an iterable of streamlines.
+    num_prototypes : int
+           The number of prototypes. In most cases 40 is enough, which
+           is the default value.
+    distance : function
+           Distance function between groups of streamlines. The
+           default is bundles_distances_mam
+    prototype_policy : string
+           Shortname for the prototype selection policy. The default
+           value is 'sff'.
+    n_jobs : int
+           If joblib is available, split the dissimilarity computation
+           in n_jobs. If n_jobs is -1, then all available cpus/cores
+           are used. The default value is -1.
+    verbose : bool
+           If true prints some messages. Deafault is True.
+
+    Return
+    ------
+    dissimilarity_matrix : array (N, num_prototypes)
+
+    See Also
+    --------
+    furthest_first_traversal, subset_furthest_first
+
+    Notes
+    -----
+    """
+    if verbose: print("Generating %s prototypes with policy %s." % (num_prototypes, prototype_policy))
+    if prototype_policy == 'random':
+        prototype_idx = np.random.permutation(len(tracks))[:num_prototypes]
+    elif prototype_policy == 'fft':
+        prototype_idx = furthest_first_traversal(tracks, num_prototypes, distance)
+    elif prototype_policy == 'sff':
+        prototype_idx = subset_furthest_first(tracks, num_prototypes, distance)
+    else:
+        if verbose: print("Prototype selection policy not supported: %s" % prototype_policy)
+        raise Exception
+
+    prototypes = [tracks[i] for i in prototype_idx]
+    dissimilarity_matrix = dissimilarity(tracks, prototypes, distance, n_jobs=n_jobs, verbose=verbose)
+    return dissimilarity_matrix, prototype_idx
