@@ -7,7 +7,8 @@ if __name__ == '__main__':
     n_streamlines = 10000
     len_min = 30
     len_max = 150
-    print("Generating random tractography.")
+    print("Generating random tractography of %s streamlines." %
+          n_streamlines)
     tracks = np.array([uniform(size=(randint(len_min, len_max), 3))
                        for i in range(n_streamlines)],
                       dtype=np.object)

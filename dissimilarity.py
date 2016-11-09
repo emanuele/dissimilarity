@@ -154,12 +154,16 @@ def dissimilarity(tracks, prototypes, distance, n_jobs=-1, verbose=False):
     Notes
     -----
     """
-    if verbose: print("Computing the dissimilarity matrix.")
+    if verbose:
+        print("Computing the dissimilarity matrix.")
+
     if joblib_available and n_jobs != 1:
         if n_jobs is None or n_jobs == -1:
             n_jobs = cpu_count()
 
-        if verbose: print("Parallel computation of the dissimilarity matrix: %s cpus." % n_jobs)
+        if verbose:
+            print("Parallel computation of the dissimilarity matrix: %s cpus." % n_jobs)
+
         if n_jobs > 1:
             tmp = np.linspace(0, len(tracks), n_jobs).astype(np.int)
         else:  # corner case: joblib detected 1 cpu only.
@@ -216,17 +220,23 @@ def compute_dissimilarity(tracks, num_prototypes=40,
     Notes
     -----
     """
-    if verbose: print("Generating %s prototypes with policy %s." % (num_prototypes, prototype_policy))
+    if verbose:
+        print("Generating %s prototypes with policy %s." % (num_prototypes, prototype_policy))
+
     if prototype_policy == 'random':
         prototype_idx = np.random.permutation(len(tracks))[:num_prototypes]
     elif prototype_policy == 'fft':
-        prototype_idx = furthest_first_traversal(tracks, num_prototypes, distance)
+        prototype_idx = furthest_first_traversal(tracks,
+                                                 num_prototypes, distance)
     elif prototype_policy == 'sff':
         prototype_idx = subset_furthest_first(tracks, num_prototypes, distance)
     else:
-        if verbose: print("Prototype selection policy not supported: %s" % prototype_policy)
+        if verbose:
+            print("Prototype selection policy not supported: %s" % prototype_policy)
+
         raise Exception
 
     prototypes = [tracks[i] for i in prototype_idx]
-    dissimilarity_matrix = dissimilarity(tracks, prototypes, distance, n_jobs=n_jobs, verbose=verbose)
+    dissimilarity_matrix = dissimilarity(tracks, prototypes, distance,
+                                         n_jobs=n_jobs, verbose=verbose)
     return dissimilarity_matrix, prototype_idx
