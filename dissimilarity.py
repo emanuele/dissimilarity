@@ -109,7 +109,7 @@ def subset_furthest_first(tracks, k, distance, permutation=True, c=2.0):
     International Workshop on Pattern Recognition in NeuroImaging
     (PRNI), pp.85,88, 2-4 July 2012 doi:10.1109/PRNI.2012.13
     """
-    size = max(1, np.ceil(c * k * np.log(k)))
+    size = int(max(1, np.ceil(c * k * np.log(k))))
     if permutation:
         idx = np.random.permutation(len(tracks))[:size]
     else:
