@@ -165,7 +165,7 @@ def dissimilarity(tracks, prototypes, distance, n_jobs=-1, verbose=False):
             print("Parallel computation of the dissimilarity matrix: %s cpus." % n_jobs)
 
         if n_jobs > 1:
-            tmp = np.linspace(0, len(tracks), n_jobs).astype(np.int)
+            tmp = np.linspace(0, len(tracks), n_jobs + 1).astype(np.int)
         else:  # corner case: joblib detected 1 cpu only.
             tmp = (0, len(tracks))
 
