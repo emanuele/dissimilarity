@@ -120,7 +120,8 @@ def subset_furthest_first(tracks, k, distance, permutation=True, c=2.0):
                                         permutation=False)]
 
 
-def dissimilarity(tracks, prototypes, distance, n_jobs=-1, verbose=False):
+def dissimilarity(tracks, prototypes, distance=bundles_distances_mam,
+                  n_jobs=-1, verbose=False):
     """Compute the dissimilarity (distance) matrix between tracks and
     given prototypes. This function supports parallel (multicore)
     computation.
